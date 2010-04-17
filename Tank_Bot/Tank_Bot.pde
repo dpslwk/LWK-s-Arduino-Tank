@@ -37,11 +37,16 @@ History
  Known issues:
         002: Mirf truncates Commands that are split over multiple packets
             
- Future changes:
- 	None
+ Notes:
+ 	Max size of any single command is 16 bytes including '#' terminator as set by BUFFERLENGHT
+        Commands are in the form xxyyy#
+        Where xx is a two char command and yyy is parameter(varible size)
+         and # is a command terminator
+
 
  ToDo:
  	Lots
+        Speed up Mirf data rate
         003: Add suport for comands split over multiple Mirf packets
  
 */

@@ -18,24 +18,38 @@ History
  	001 - Initial release  
                First hash up of tank server
                Takes a commnad via serial and re-transmits via Mirf
+        002 - Mirf update
+               Now reads all available data off the serial buffer  
+               and transmits in BUFFERLENGHT sieze packets via Mirf
+               Can now transmit multiple commands via a singe Mirf packet
+            - Updated Serial Speed to 115200
+            - Started Adding WiiChuck
+ 
  Known issues:
         None
- Future changes:
- 	None
+ Notes:
+ 	Max size of any single command is 16 bytes including '#' terminator as set by BUFFERLENGHT
+        Commands are in the form xxyyy#
+        Where xx is a two char command and yyy is parameter(varible size)
+         and # is a command terminator
 
  ToDo:
  	Lots
-        Add WiiChuck to generate commands
+        Speed up Mirf data rate
+        003: Add WiiChuck to generate commands
 */
 
 #include <Wire.h>
 #include <Spi.h>
 #include <mirf.h>
 #include <nRF24L01.h>
+#include <WiiChuckClass.h>
+
 
 #define BUFFERLENGTH 16 
 char commandEnd = '#';
 
+WiiChuck chuck = WiiChuck();
 //I2C power pins
 int wirePwr = 17;
 int wireGnd = 16;
@@ -43,7 +57,7 @@ int wireGnd = 16;
 void setup(){
 
   // Open serial port
-  Serial.begin(9600);
+  Serial.begin(115200);    // run serial port fast so buffer fills
   // Init I2C & Power Compass 
   pinMode(wirePwr, OUTPUT);
   pinMode(wireGnd, OUTPUT);
@@ -57,31 +71,46 @@ void setup(){
   Mirf.setRADDR((byte *)"serv1");
   Mirf.payload = BUFFERLENGTH;
   Mirf.config();
+  Mirf.setTADDR((byte *)"tank1");
+  
+  // Start WiiChuck
+  chuck.begin();
+  chuck.update();
+  // chuck.calibrateJoy();
   
 } // end setup()
 
 void loop(){
  /**************************************************** 
  *  
- *  grabs a command form the serial buffer and passes
- *  it onto the HandleCommnad
+ *  grabs form the serial buffer and passes
+ *  it onto the Mirf
  *
  ****************************************************/
-  int inputLength = 0;
-  char inputBuffer[BUFFERLENGTH] = {0};
+ int outputLength = 0;
+ char outputBuffer[BUFFERLENGTH] = {0};
+ if (Serial.available()){
+  delay(1); // allow time for buffer to fill
   do {
-    while (!Serial.available()); // wait for input
-    inputBuffer[inputLength] = Serial.read(); // read it in
-  } while (inputBuffer[inputLength] != commandEnd && ++inputLength < BUFFERLENGTH);
+    outputBuffer[outputLength] = Serial.read(); // read it in
+  } while (Serial.available() && ++outputLength < BUFFERLENGTH);
 
-  HandleCommand(inputBuffer, inputLength);
+ //MIRF to relay command 
+  Mirf.send((byte *) outputBuffer);
   
+  while(Mirf.isSending()){
+  }
+  Serial.print("Sent:\t");
+  Serial.println(outputBuffer);
+ }
+ 
+ 
 } // end loop()
 
 
 /**************************************************** 
  *  Deal with incoming commnad
- *  for now it just re-transmits via the Mirf
+ *  for 002 does nothing
  *
  ****************************************************/
 void HandleCommand(char* input, int length) {
@@ -89,15 +118,7 @@ void HandleCommand(char* input, int length) {
   if (length < 2) { // not a valid command
     return;
   }
-  //MIRF to relay command 
 
-  Mirf.setTADDR((byte *)"tank1");
-  
-  Mirf.send((byte *) input);
-  
-  while(Mirf.isSending()){
-  }
-  Serial.println("Finished sending");
 } // end HandelCommand(char* input, int length)
 
 

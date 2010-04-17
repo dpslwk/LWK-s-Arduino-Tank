@@ -52,7 +52,7 @@ boolean masterserial = true;    // enable/disable serial functions
 void setup() 
 {
   if (masterserial) {
-    Sarduino = new Serial(this, Serial.list()[0], 9600);
+    Sarduino = new Serial(this, Serial.list()[0], 115200);
   }
   
 
