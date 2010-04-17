@@ -24,9 +24,16 @@ History
                Can now transmit multiple commands via a singe Mirf packet
             - Updated Serial Speed to 115200
             - Started Adding WiiChuck
- 
+        003 - First WiiChuck Support added
+               If holding buttonC reads joyX & joyY and sends move commands via Mirf
+               maths is out and doesn't reach top speed,
+               chuck only reports between 0-100~ not 0-128 
+               
+            
+               
  Known issues:
-        None
+        003: WiiChuck maths is out and doesn't reach top speed!!
+             Realse of buttonC does not send stop commands so tank continues on lastPacket
  Notes:
  	Max size of any single command is 16 bytes including '#' terminator as set by BUFFERLENGHT
         Commands are in the form xxyyy#
@@ -44,6 +51,7 @@ History
 #include <mirf.h>
 #include <nRF24L01.h>
 #include <WiiChuckClass.h>
+#include <stdio.h>
 
 
 #define BUFFERLENGTH 16 
@@ -82,30 +90,132 @@ void setup(){
 
 void loop(){
  /**************************************************** 
- *  
  *  grabs form the serial buffer and passes
  *  it onto the Mirf
- *
  ****************************************************/
- int outputLength = 0;
- char outputBuffer[BUFFERLENGTH] = {0};
- if (Serial.available()){
-  delay(1); // allow time for buffer to fill
-  do {
-    outputBuffer[outputLength] = Serial.read(); // read it in
-  } while (Serial.available() && ++outputLength < BUFFERLENGTH);
-
- //MIRF to relay command 
-  Mirf.send((byte *) outputBuffer);
+  int outputLength = 0;
+  char outputBuffer[BUFFERLENGTH] = {0};
   
-  while(Mirf.isSending()){
+  if (Serial.available()){
+    delay(1); // allow time for buffer to fill
+    do {
+      outputBuffer[outputLength] = Serial.read(); // read it in
+    } while (Serial.available() && ++outputLength < BUFFERLENGTH);
+    
+     //MIRF to relay command 
+    Mirf.send((byte *) outputBuffer);
+    
+    while(Mirf.isSending()){
+    }
+/*    
+    Serial.print("Sent:\t");
+    Serial.println(outputBuffer);
+*/
+  } // end  if (Serial.available())
+ 
+ /**************************************************** 
+ *  Check chuck for c button and gen move commands
+ *  
+ ****************************************************/
+  chuck.update();
+  if (chuck.buttonC) {  //hold button C to send move commands, 
+    ChuckMove();
   }
-  Serial.print("Sent:\t");
-  Serial.println(outputBuffer);
- }
+ 
  
  
 } // end loop()
+
+
+/**************************************************** 
+ *  Generate move commands off chuck joysticks
+ *  and transmit via Mirf
+ *
+ ****************************************************/
+void ChuckMove() {
+  int leftDir = 1;    // varibles to hold motor data
+  int rightDir = 1;
+  int leftSpeed = 0;
+  int rightSpeed = 0; 
+  
+  int leftMotor = 0;
+  int rightMotor = 0;
+  int curX = chuck.readJoyX();       // var's to hold translated mouse pos
+  int curY = chuck.readJoyY();
+  char packet[BUFFERLENGTH + 1] = {0};              // data packet
+  char lastPacket[BUFFERLENGTH + 1] = {0};
+  //char stopPacket[BUFFERLENGTH] = "L1000#R1000#";     //Stop Packet
+  float lastSend;
+  
+  if (curY > -5 && curY < 5 && curX > -5 && curX < 5) {          // dead stop
+    leftMotor = 0;
+    rightMotor = 0;
+  } else if (curY > -5 && curY < 5 && curX > -5) {                // spin left
+    leftMotor = constrain(2 * curX, -255, 255);
+    rightMotor = constrain(2 * curX, -255, 255) * -1;
+  } else if (curY > -5 && curY < 5 && curX < 5) {                 // spin right
+    leftMotor = constrain(2 * curX, -255, 255);
+    rightMotor = constrain(2 * curX, -255, 255) * -1;
+  } else if (curX > -5 && curX < 5 && curY > 5) {                 // forwards
+    leftMotor = constrain(2 * curY, -255, 255);
+    rightMotor = constrain(2 * curY, -255, 255);
+  } else if (curX > -5 && curX < 5 && curY < -5) {                // backwards
+    leftMotor = constrain(2 * curY, -255, 255);
+    rightMotor = constrain(2 * curY, -255, 255);
+  } else if (curY >= 0) {
+    leftMotor = constrain(2 * curY + curX, -255, 255);
+    rightMotor = constrain(2 * curY - curX, -255, 255);
+  } else if (curY < 0) {
+    leftMotor = constrain(2 * curY - curX, -255, 255);
+    rightMotor = constrain(2 * curY + curX, -255, 255);  
+  }
+  
+  if (leftMotor >= 0) {
+    leftDir = 1;
+    leftSpeed = leftMotor;
+  } else {
+    leftDir = 0;
+    leftSpeed = leftMotor * -1;
+  }
+  
+  if (rightMotor >= 0) {
+    rightDir = 1;
+    rightSpeed = rightMotor;
+  } else {
+    rightDir = 0;
+    rightSpeed = rightMotor * -1;
+  }
+  
+ 
+  // construct data packet
+  // java method
+  // packet = 'L' + leftDir + leftSpeed + "#R" + rightDir + rightSpeed + '#';
+  
+  sprintf(packet, "L%d%d#R%d%d#", leftDir, leftSpeed, rightDir, rightSpeed);
+
+/* 
+  Serial.print("Chuck X,Y:\t");
+  Serial.print(curX);
+  Serial.print("\t");
+  Serial.println(curY);
+  Serial.print("Chuck Packet:\t");
+  Serial.println(packet);
+*/
+  if (packet != lastPacket ){
+      if (millis() > lastSend + 100) {    // only transmit packets ever 100ms
+        lastSend = millis();
+        // lastPacket = packet;     // this dont work in arduino use :-
+        memcpy(lastPacket, packet, sizeof(lastPacket)); 
+
+
+        Mirf.send((byte *) packet);
+  
+        while(Mirf.isSending()){
+        }
+      }
+  }
+
+} // end ChuckMove()
 
 
 /**************************************************** 
@@ -114,7 +224,9 @@ void loop(){
  *
  ****************************************************/
 void HandleCommand(char* input, int length) {
+/*  
   Serial.println(input);
+*/  
   if (length < 2) { // not a valid command
     return;
   }
