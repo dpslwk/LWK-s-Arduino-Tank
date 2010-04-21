@@ -51,7 +51,7 @@ void loop(){
    */
    
   char data[16] = {0};
-  
+  Serial.print(".");
   /*
    * If a packet has been recived.
    */
