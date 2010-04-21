@@ -53,7 +53,7 @@ History
 #include <WiiChuckClass.h>
 #include <stdio.h>
 
-
+#define VERSION_NUM 003
 #define BUFFERLENGTH 16 
 char commandEnd = '#';
 
@@ -66,6 +66,10 @@ void setup(){
 
   // Open serial port
   Serial.begin(115200);    // run serial port fast so buffer fills
+  Serial.print("Tank_Serv v:");
+  Serial.println(VERSION_NUM);
+  Serial.println("Hello...");
+  
   // Init I2C & Power Compass 
   pinMode(wirePwr, OUTPUT);
   pinMode(wireGnd, OUTPUT);
@@ -109,7 +113,7 @@ void loop(){
     }
 /*    
     Serial.print("Sent:\t");
-    Serial.println(outputBuffer);
+    Serial.println(outputBuffer);  //not this sends a junk char if ouputBuffer is full and has no NULL
 */
   } // end  if (Serial.available())
  
@@ -151,39 +155,39 @@ void ChuckMove() {
     leftMotor = 0;
     rightMotor = 0;
   } else if (curY > -5 && curY < 5 && curX > -5) {                // spin left
-    leftMotor = constrain(2 * curX, -255, 255);
-    rightMotor = constrain(2 * curX, -255, 255) * -1;
+    leftMotor = constrain(2 * curX, -200, 200);
+    rightMotor = constrain(2 * curX, -200, 200) * -1;
   } else if (curY > -5 && curY < 5 && curX < 5) {                 // spin right
-    leftMotor = constrain(2 * curX, -255, 255);
-    rightMotor = constrain(2 * curX, -255, 255) * -1;
+    leftMotor = constrain(2 * curX, -200, 200);
+    rightMotor = constrain(2 * curX, -200, 200) * -1;
   } else if (curX > -5 && curX < 5 && curY > 5) {                 // forwards
-    leftMotor = constrain(2 * curY, -255, 255);
-    rightMotor = constrain(2 * curY, -255, 255);
+    leftMotor = constrain(2 * curY, -200, 200);
+    rightMotor = constrain(2 * curY, -200, 200);
   } else if (curX > -5 && curX < 5 && curY < -5) {                // backwards
-    leftMotor = constrain(2 * curY, -255, 255);
-    rightMotor = constrain(2 * curY, -255, 255);
+    leftMotor = constrain(2 * curY, -200, 200);
+    rightMotor = constrain(2 * curY, -200, 200);
   } else if (curY >= 0) {
-    leftMotor = constrain(2 * curY + curX, -255, 255);
-    rightMotor = constrain(2 * curY - curX, -255, 255);
+    leftMotor = constrain(2 * curY + curX, -200, 200);
+    rightMotor = constrain(2 * curY - curX, -200, 200);
   } else if (curY < 0) {
-    leftMotor = constrain(2 * curY - curX, -255, 255);
-    rightMotor = constrain(2 * curY + curX, -255, 255);  
+    leftMotor = constrain(2 * curY - curX, -200, 200);
+    rightMotor = constrain(2 * curY + curX, -200, 200);  
   }
   
   if (leftMotor >= 0) {
     leftDir = 1;
-    leftSpeed = leftMotor;
+    leftSpeed = leftMotor * 1.275;
   } else {
     leftDir = 0;
-    leftSpeed = leftMotor * -1;
+    leftSpeed = (leftMotor * -1) * 1.275 ;
   }
   
   if (rightMotor >= 0) {
     rightDir = 1;
-    rightSpeed = rightMotor;
+    rightSpeed = rightMotor * 1.275;
   } else {
     rightDir = 0;
-    rightSpeed = rightMotor * -1;
+    rightSpeed = (rightMotor * -1) * 1.275;
   }
   
  
@@ -212,6 +216,7 @@ void ChuckMove() {
   
         while(Mirf.isSending()){
         }
+        
       }
   }
 
