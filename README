@@ -1,0 +1,14 @@
+/****************************************************	
+ * sketch = Tank Bot
+ * LWK's Tank Bot
+ * Copyright (c)2010 LWK All right reserved
+ * Source = lwk.mjhosting.co.uk
+ * Target controller = Arduino (freeduino 328)
+ * Clock speed = 16 MHz
+ * Development platform = Arduino IDE 0018.
+ * C compiler = WinAVR from Arduino IDE 0018
+ * Programer = Arduino 
+ * 
+ * 328 Arduino, HMC6352, nRF24L01+, Arduino Tank, SN754410 
+ * 
+ ****************************************************/

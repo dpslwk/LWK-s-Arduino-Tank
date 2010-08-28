@@ -10,7 +10,8 @@
 History
  	001 - Initial release  
                First hash up of tank processing client
-               
+        002 - Adding touchOSC pass through controls
+        
  Known issues:
         None
  Future changes:
@@ -22,6 +23,11 @@ History
 
 
 import processing.serial.*;
+
+// OSC libaries
+import oscP5.*;
+import netP5.*;
+OscP5 oscP5;
 
 Serial Sarduino;       // setup arduino serial instance
 PFont fontA;           // font
@@ -47,7 +53,14 @@ String lastPacket = "";
 String stopPacket = "L1000#R1000#";     //Stop Packet
 float lastSend;
 boolean enabled = false;        // enable/disable serial output to make arduino move
+boolean OSCenabled = false;     // enable/disable serial output to make arduino move via OSC
 boolean masterserial = true;    // enable/disable serial functions
+
+// OSC xy
+boolean xyPadNeedsRedraw = true;
+float xPad = 120, yPad = 120; 
+int [] xyPadStrip = new int [5];
+
 
 void setup() 
 {
@@ -68,7 +81,10 @@ void setup()
 
   // Set the font and its size (in units of pixels)
   textFont(fontA, 32);
-
+  
+  /* start oscP5, listening for incoming messages at port 8000 */
+  oscP5 = new OscP5(this,8000);
+  
 }// end setuo()
 
 void mouseClicked() {
@@ -84,11 +100,43 @@ void mouseClicked() {
   }
 }// end mouseClicked()
 
+void oscEvent(OscMessage theOscMessage) {
+    String addr = theOscMessage.addrPattern();     
+//   println(addr);   // uncomment for seeing the raw message
+    
+    if(addr.indexOf("/3/xy") !=-1 && !(addr.indexOf("/3/xy/z") !=-1)){ // the 8 X Y area
+    xPad =  (theOscMessage.get(0).floatValue());
+    yPad =  (theOscMessage.get(1).floatValue());
+    println(" x = "+xPad+" y = "+yPad);  // uncomment to see x & Y values
+    xyPadNeedsRedraw = true;
+    }
+    if(addr.indexOf("/3/toggle") !=-1){   // the strip at the bottom
+      int i = int((addr.charAt(9) )) - 0x30;   // retrns the ASCII number so convert into a real number by subtracting 0x30
+      xyPadStrip[i]  = int(theOscMessage.get(0).floatValue());
+//      println(" i = "+i);   // uncomment to see index value
+      xyPadNeedsRedraw = true;
+   }
+}// end void oscEvent(OscMessage theOscMessage)
+
 void draw() 
 {   
   background(51); 
-  curX = mouseX - 127;
-  curY = (mouseY -127) * -1;
+  if(xyPadStrip[1] == 1){     // if first box is on use osc enable
+    OSCenabled = true;
+    curX = round(xPad*255) - 127;
+    curY = ( round(yPad*255) -127) * -1;
+  } else {                    // use mouse of curXY
+    OSCenabled = false;
+
+    lastPacket = stopPacket;
+    if (masterserial) {
+      Sarduino.write(stopPacket); 
+    }
+    curX = mouseX - 127;
+    curY = (mouseY -127) * -1;
+  }
+  
+  
   fill(255, 80);
   rect(117, 0, 20, 255);
   rect(0, 117, 255, 20);
@@ -149,7 +197,7 @@ void draw()
   packet = "L" + leftDir + leftSpeed + "#R" + rightDir + rightSpeed + "#";
 
   
-  if (enabled){
+  if (enabled || OSCenabled){
     text("enabled", 147, 225);
     if (!packet.equals(lastPacket)){
       if (millis() > lastSend + 100) {    // only transmit packets ever 100ms
